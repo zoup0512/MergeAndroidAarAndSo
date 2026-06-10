@@ -1,6 +1,10 @@
 @echo off
 setlocal EnableExtensions EnableDelayedExpansion
 
+rem Save script path before any shifts
+for %%I in ("%~f0") do set "SCRIPT_FILE=%%~fI"
+for %%I in ("%~f0") do set "SCRIPT_DIR=%%~dpI"
+
 rem Usage:
 rem   merge.bat [-o out.aar] [-m AndroidManifest.xml] [-abi arm64-v8a,armeabi-v7a] [-so <soDirOrSoFile>]... <in1.aar> <in2.aar> ...
 rem
@@ -57,14 +61,12 @@ if "%OUT_AAR%"=="" (
   set "OUT_AAR=merged.aar"
 )
 
-for %%I in ("%~f0") do set "SCRIPT_FILE=%%~fI"
-for %%I in ("%~f0") do set "SCRIPT_DIR=%%~dpI"
 set "SCRIPT_DIR_NOSLASH=%SCRIPT_DIR%"
 if "%SCRIPT_DIR_NOSLASH:~-1%"=="\" set "SCRIPT_DIR_NOSLASH=%SCRIPT_DIR_NOSLASH:~0,-1%"
 
 set "TMP_PS1=%TEMP%\merge_aar_%RANDOM%_%RANDOM%.ps1"
 
-powershell -NoProfile -ExecutionPolicy Bypass -Command "$c = Get-Content -LiteralPath '%SCRIPT_FILE%' -Raw; $m = '###PS_SCRIPT_START###'; $idx = $c.LastIndexOf($m); if ($idx -lt 0) { Write-Host 'ERROR: embedded ps script marker not found' -ForegroundColor Red; exit 1 }; $ps = $c.Substring($idx + $m.Length); $ps = $ps -replace '^[\r\n]+' , ''; Set-Content -LiteralPath '%TMP_PS1%' -Value $ps -Encoding UTF8"
+powershell -NoProfile -ExecutionPolicy Bypass -Command "& {param($sf,$tmp) $c = Get-Content -LiteralPath $sf -Raw; $m = '###PS_SCRIPT_START###'; $idx = $c.LastIndexOf($m); if ($idx -lt 0) { Write-Host 'ERROR: embedded ps script marker not found' -ForegroundColor Red; exit 1 }; $ps = $c.Substring($idx + $m.Length); $ps = $ps -replace '^[\r\n]+' , ''; Set-Content -LiteralPath $tmp -Value $ps -Encoding UTF8}" -sf "%SCRIPT_FILE%" -tmp "%TMP_PS1%"
 if errorlevel 1 exit /b 1
 
 powershell -NoProfile -ExecutionPolicy Bypass -File "%TMP_PS1%" -BaseDir "%SCRIPT_DIR_NOSLASH%" -OutAar "%OUT_AAR%" -Manifest "%MANIFEST%" -AbiFilter "%ABI_FILTER%" -SoDirs "%SO_DIRS%" -InputAars "%INPUT_AARS%"
